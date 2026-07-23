@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Vocoder Simulator - Prototyp</title>
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --accent-color: #4fc3f7;
+            --background-color: #f8f9fa;
+            --text-color: #333;
+            --slider-color: #4a6fa5;
+            --button-color: #166088;
+            --button-hover: #4a6fa5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: var(--secondary-color);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .panel h2 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 1.3em;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-group label {
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+
+        .audio-source-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid var(--primary-color);
+            border-radius: 5px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        select:focus, button:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        button {
+            background: var(--button-color);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: var(--button-hover);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 15px;
+            background: var(--button-color);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-label:hover {
+            background: var(--button-hover);
+        }
+
+        .band-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .band {
+            background: #f0f4f8;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .band label {
+            display: block;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+
+        .band input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ddd;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .band input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--slider-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .band input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--slider-color);
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .band-value {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 200px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .status {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .status.active {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        .status.error {
+            color: #e74c3c;
+        }
+
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--accent-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .comparison-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .comparison-controls button {
+            flex: 1;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid var(--accent-color);
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .info-box h3 {
+            color: var(--secondary-color);
+            margin-bottom: 8px;
+        }
+
+        .band-frequencies {
+            font-size: 0.75em;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 600px) {
+            .band-controls {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .subtitle {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>🔊 CI Vocoder Simulator</h1>
+    <p class="subtitle">Simuliere, wie dein Cochlea-Implantat klingt – mit 8 Frequenzbändern und anpassbaren Parametern.</p>
+
+    <div class="container">
+        <!-- Linkes Panel: Steuerung -->
+        <div class="panel">
+            <h2>🎛️ Steuerung</h2>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>Audio-Quelle:</label>
+                    <div class="audio-source-selector">
+                        <select id="audioSource">
+                            <option value="microphone">🎤 Mikrofon</option>
+                            <option value="file">📁 Audiodatei</option>
+                        </select>
+                        <label for="fileInput" class="file-label">Datei auswählen</label>
+                        <input type="file" id="fileInput" class="file-input" accept="audio/*">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Anzahl Bänder:</label>
+                    <select id="bandCount">
+                        <option value="4">4 Bänder</option>
+                        <option value="8" selected>8 Bänder</option>
+                        <option value="12">12 Bänder</option>
+                        <option value="16">16 Bänder</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Träger-Signal:</label>
+                    <select id="carrierType">
+                        <option value="noise" selected>🔊 Rauschen (Noise)</option>
+                        <option value="sine">🌊 Sinus</option>
+                        <option value="pulse">⚡ Pulse (GET)</option>
+                    </select>
+                </div>
+
+                <div class="toggle-container">
+                    <label>Dynamikkompression:</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="compressionToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="toggle-container">
+                    <label>ACE-Strategie (n-of-m):</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="aceToggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="aceInfo" style="display: none; font-size: 0.85em; color: #666;">
+                        (Aktiviert: Nur die 4 lautesten Bänder)
+                    </span>
+                </div>
+
+                <div class="comparison-controls">
+                    <button id="playOriginal">🔊 Original abspielen</button>
+                    <button id="playVocoded">🔊 Vocoded abspielen</button>
+                    <button id="playBoth">🔊 Beide abspielen</button>
+                </div>
+
+                <button id="startStop" class="primary">🚀 Simulation starten</button>
+                <button id="reset" class="secondary">🔄 Zurücksetzen</button>
+            </div>
+
+            <div class="status" id="status">Bereit – wähle eine Audio-Quelle und klicke auf "Simulation starten".</div>
+
+            <div class="info-box">
+                <h3>💡 Tipps:</h3>
+                <p>• Beginne mit <strong>8 Bändern</strong> und <strong>Rauschen als Träger</strong> für eine klassische CI-Simulation.</p>
+                <p>• Passe die <strong>Lautstärke pro Band</strong> an, um deinen CI-Klang nachzuempfinden.</p>
+                <p>• Aktiviere die <strong>Dynamikkompression</strong>, um den begrenzten Dynamikumfang von CIs zu simulieren.</p>
+            </div>
+        </div>
+
+        <!-- Rechtes Panel: Bänder & Visualisierung -->
+        <div class="panel">
+            <h2>🎚️ Frequenzbänder</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                Passe die Lautstärke für jedes Frequenzband an (0 = stumm, 1 = volle Lautstärke).
+            </p>
+            
+            <div class="band-controls" id="bandControls">
+                <!-- Bänder werden dynamisch eingefügt -->
+            </div>
+
+            <h2 style="margin-top: 25px;">📊 Spektrum-Analyse</h2>
+            <canvas class="visualizer" id="visualizer"></canvas>
+            <div class="status" id="visualizerStatus">Visualisierung: Vocoded-Signal</div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // CI Vocoder Simulator - Hauptcode
+        // ============================================
+
+        // Globale Variablen
+        let audioCtx;
+        let source;
+        let vocodedOutput;
+        let originalOutput;
+        let analyser;
+        let bands = [];
+        let noiseSources = [];
+        let isPlaying = false;
+        let currentAudioBuffer = null;
+        let visualizerCanvas, visualizerCtx;
+        let animationId = null;
+        let mediaStream = null;
+        let compressionNode = null;
+
+        // Band-Frequenzen (logarithmisch verteilt)
+        const bandPresets = {
+            4: [
+                { min: 100, max: 500, label: "100-500 Hz" },
+                { min: 500, max: 1200, label: "500-1200 Hz" },
+                { min: 1200, max: 3000, label: "1200-3000 Hz" },
+                { min: 3000, max: 8000, label: "3000-8000 Hz" }
+            ],
+            8: [
+                { min: 100, max: 250, label: "100-250 Hz" },
+                { min: 250, max: 400, label: "250-400 Hz" },
+                { min: 400, max: 600, label: "400-600 Hz" },
+                { min: 600, max: 900, label: "600-900 Hz" },
+                { min: 900, max: 1300, label: "900-1300 Hz" },
+                { min: 1300, max: 1800, label: "1300-1800 Hz" },
+                { min: 1800, max: 2500, label: "1800-2500 Hz" },
+                { min: 2500, max: 8000, label: "2500-8000 Hz" }
+            ],
+            12: [
+                { min: 100, max: 200, label: "100-200 Hz" },
+                { min: 200, max: 300, label: "200-300 Hz" },
+                { min: 300, max: 450, label: "300-450 Hz" },
+                { min: 450, max: 600, label: "450-600 Hz" },
+                { min: 600, max: 800, label: "600-800 Hz" },
+                { min: 800, max: 1000, label: "800-1000 Hz" },
+                { min: 1000, max: 1300, label: "1000-1300 Hz" },
+                { min: 1300, max: 1700, label: "1300-1700 Hz" },
+                { min: 1700, max: 2200, label: "1700-2200 Hz" },
+                { min: 2200, max: 3000, label: "2200-3000 Hz" },
+                { min: 3000, max: 4500, label: "3000-4500 Hz" },
+                { min: 4500, max: 8000, label: "4500-8000 Hz" }
+            ],
+            16: [
+                { min: 100, max: 180, label: "100-180 Hz" },
+                { min: 180, max: 250, label: "180-250 Hz" },
+                { min: 250, max: 320, label: "250-320 Hz" },
+                { min: 320, max: 400, label: "320-400 Hz" },
+                { min: 400, max: 500, label: "400-500 Hz" },
+                { min: 500, max: 630, label: "500-630 Hz" },
+                { min: 630, max: 800, label: "630-800 Hz" },
+                { min: 800, max: 1000, label: "800-1000 Hz" },
+                { min: 1000, max: 1250, label: "1000-1250 Hz" },
+                { min: 1250, max: 1600, label: "1250-1600 Hz" },
+                { min: 1600, max: 2000, label: "1600-2000 Hz" },
+                { min: 2000, max: 2500, label: "2000-2500 Hz" },
+                { min: 2500, max: 3150, label: "2500-3150 Hz" },
+                { min: 3150, max: 4000, label: "3150-4000 Hz" },
+                { min: 4000, max: 5000, label: "4000-5000 Hz" },
+                { min: 5000, max: 8000, label: "5000-8000 Hz" }
+            ]
+        };
+
+        // Initialisierung
+        document.addEventListener('DOMContentLoaded', () => {
+            visualizerCanvas = document.getElementById('visualizer');
+            visualizerCtx = visualizerCanvas.getContext('2d');
+            
+            // Event-Listener registrieren
+            document.getElementById('startStop').addEventListener('click', toggleSimulation);
+            document.getElementById('reset').addEventListener('click', resetSimulation);
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('playOriginal').addEventListener('click', () => playSignal('original'));
+            document.getElementById('playVocoded').addEventListener('click', () => playSignal('vocoded'));
+            document.getElementById('playBoth').addEventListener('click', () => playSignal('both'));
+            document.getElementById('bandCount').addEventListener('change', updateBandCount);
+            document.getElementById('carrierType').addEventListener('change', updateCarrierType);
+            document.getElementById('compressionToggle').addEventListener('change', updateCompression);
+            document.getElementById('aceToggle').addEventListener('change', toggleACE);
+            
+            // UI initialisieren
+            updateBandCount();
+            updateACEInfo();
+        });
+
+        // ============================================
+        // Hauptfunktionen
+        // ============================================
+
+        async function toggleSimulation() {
+            const startStopBtn = document.getElementById('startStop');
+            const audioSource = document.getElementById('audioSource').value;
+            const statusEl = document.getElementById('status');
+
+            if (isPlaying) {
+                // Simulation stoppen
+                stopSimulation();
+                startStopBtn.textContent = '🚀 Simulation starten';
+                statusEl.textContent = 'Bereit – wähle eine Audio-Quelle.';
+                statusEl.className = 'status';
+                isPlaying = false;
+                return;
+            }
+
+            // Simulation starten
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Analyser für Visualisierung
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+
+                // Ausgabeknoten
+                vocodedOutput = audioCtx.createGain();
+                originalOutput = audioCtx.createGain();
+                
+                // Dynamikkompression
+                updateCompression();
+
+                // Audio-Quelle laden
+                if (audioSource === 'microphone') {
+                    await startMicrophone();
+                } else if (audioSource === 'file' && currentAudioBuffer) {
+                    startFilePlayback();
+                } else if (audioSource === 'file' && !currentAudioBuffer) {
+                    statusEl.textContent = 'Bitte wähle zuerst eine Audiodatei!';
+                    statusEl.className = 'status error';
+                    return;
+                }
+
+                // Bänder erstellen
+                createBands();
+
+                // Signalfluss verbinden
+                connectSignalFlow();
+
+                // Visualisierung starten
+                startVisualization();
+
+                startStopBtn.textContent = '⏹️ Simulation stoppen';
+                statusEl.textContent = 'Simulation läuft...';
+                statusEl.className = 'status active';
+                isPlaying = true;
+
+            } catch (error) {
+                console.error('Fehler beim Starten der Simulation:', error);
+                statusEl.textContent = `Fehler: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        }
+
+        function stopSimulation() {
+            // Alle Verbindungen trennen
+            if (source) {
+                source.disconnect();
+                source = null;
+            }
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+
+            // Bänder bereinigen
+            bands.forEach(band => {
+                if (band.noiseSource) band.noiseSource.stop();
+                if (band.pulseOscillator) band.pulseOscillator.stop();
+            });
+            bands = [];
+            noiseSources = [];
+
+            // Visualisierung stoppen
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+
+            // Audio-Kontext nicht schließen (wird für neue Simulation wiederverwendet)
+        }
+
+        function resetSimulation() {
+            stopSimulation();
+            
+            // UI zurücksetzen
+            document.getElementById('startStop').textContent = '🚀 Simulation starten';
+            document.getElementById('status').textContent = 'Bereit – wähle eine Audio-Quelle.';
+            document.getElementById('status').className = 'status';
+            document.getElementById('visualizerStatus').textContent = 'Visualisierung: Vocoded-Signal';
+            
+            // Bänder zurücksetzen
+            updateBandCount();
+            
+            // Audio-Kontext zurücksetzen (für sauberen Neustart)
+            if (audioCtx) {
+                audioCtx.close();
+                audioCtx = null;
+            }
+            
+            isPlaying = false;
+            currentAudioBuffer = null;
+        }
+
+        // ============================================
+        // Audio-Quellen
+        // ============================================
+
+        async function startMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaStream = stream;
+                source = audioCtx.createMediaStreamSource(stream);
+            } catch (error) {
+                throw new Error('Mikrofonzugriff verweigert. Bitte erlaube den Zugriff auf das Mikrofon.');
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const arrayBuffer = e.target.result;
+                    currentAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    document.getElementById('status').textContent = `Datei geladen: ${file.name}`;
+                    document.getElementById('status').className = 'status active';
+                } catch (error) {
+                    console.error('Fehler beim Laden der Audiodatei:', error);
+                    document.getElementById('status').textContent = 'Fehler beim Laden der Datei.';
+                    document.getElementById('status').className = 'status error';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function startFilePlayback() {
+            if (!currentAudioBuffer) return;
+            
+            source = audioCtx.createBufferSource();
+            source.buffer = currentAudioBuffer;
+            source.loop = true;
+        }
+
+        // ============================================
+        // Band-Verwaltung
+        // ============================================
+
+        function createBands() {
+            // Alte Bänder bereinigen
+            bands.forEach(band => {
+                if (band.noiseSource) band.noiseSource.stop();
+                if (band.pulseOscillator) band.pulseOscillator.stop();
+            });
+            bands = [];
+            noiseSources = [];
+
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const bandConfig = bandPresets[bandCount];
+            const carrierType = document.getElementById('carrierType').value;
+
+            bandConfig.forEach((bandFreq, index) => {
+                // Bandpass-Filter
+                const bandpass = audioCtx.createBiquadFilter();
+                bandpass.type = 'bandpass';
+                bandpass.frequency.value = (bandFreq.min + bandFreq.max) / 2;
+                bandpass.Q.value = calculateQ(bandFreq.min, bandFreq.max);
+
+                // Hüllkurvenextraktion: Gleichrichtung + Tiefpass
+                const rectifier = audioCtx.createWaveShaper();
+                rectifier.curve = createRectifierCurve();
+
+                const envelopeFilter = audioCtx.createBiquadFilter();
+                envelopeFilter.type = 'lowpass';
+                envelopeFilter.frequency.value = 100; // Cutoff für Hüllkurve
+
+                // Träger-Signal
+                let carrierSource, carrierGain;
+                if (carrierType === 'noise') {
+                    carrierSource = audioCtx.createBufferSource();
+                    carrierSource.buffer = createNoiseBuffer(audioCtx, 2);
+                    carrierSource.loop = true;
+                    carrierSource.start();
+                    noiseSources.push(carrierSource);
+                } else if (carrierType === 'sine') {
+                    carrierSource = audioCtx.createOscillator();
+                    carrierSource.type = 'sine';
+                    carrierSource.frequency.value = (bandFreq.min + bandFreq.max) / 2;
+                    carrierSource.start();
+                } else if (carrierType === 'pulse') {
+                    carrierSource = audioCtx.createOscillator();
+                    carrierSource.type = 'sine';
+                    carrierSource.frequency.value = 900; // Pulsrate
+                    carrierSource.start();
+                    
+                    // Pulsformung mit Gain
+                    const pulseShaper = audioCtx.createGain();
+                    pulseShaper.gain.value = 0;
+                    
+                    // Puls-Envelope (Gauß-Puls)
+                    const pulseEnv = audioCtx.createOscillator();
+                    pulseEnv.type = 'sine';
+                    pulseEnv.frequency.value = 50; // Langsame Hüllkurve
+                    pulseEnv.start();
+                    
+                    const pulseEnvGain = audioCtx.createGain();
+                    pulseEnvGain.gain.value = 0.5;
+                    
+                    pulseEnv.connect(pulseEnvGain);
+                    pulseEnvGain.connect(pulseShaper.gain);
+                    
+                    carrierSource.connect(pulseShaper);
+                    carrierSource = pulseShaper;
+                }
+
+                carrierGain = audioCtx.createGain();
+                carrierGain.gain.value = 0;
+
+                // Band-Gain (für Lautstärke-Regler)
+                const bandGain = audioCtx.createGain();
+                bandGain.gain.value = 1;
+
+                // Signalfluss: Quelle -> Bandpass -> Gleichrichter -> Hüllkurve -> Träger-Gain
+                if (source) {
+                    source.connect(bandpass);
+                }
+                bandpass.connect(rectifier);
+                rectifier.connect(envelopeFilter);
+                envelopeFilter.connect(carrierGain.gain);
+                
+                if (carrierType === 'noise') {
+                    carrierSource.connect(carrierGain);
+                } else {
+                    carrierSource.connect(carrierGain);
+                }
+                
+                carrierGain.connect(bandGain);
+                bandGain.connect(vocodedOutput);
+
+                // Band-Objekt speichern
+                bands.push({
+                    bandpass,
+                    rectifier,
+                    envelopeFilter,
+                    carrierSource,
+                    carrierGain,
+                    bandGain,
+                    bandFreq,
+                    index
+                });
+            });
+
+            // UI für Bänder aktualisieren
+            updateBandUI();
+        }
+
+        function updateBandCount() {
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const bandConfig = bandPresets[bandCount];
+            updateBandUI(bandConfig);
+        }
+
+        function updateBandUI(bandConfig) {
+            const bandControls = document.getElementById('bandControls');
+            bandControls.innerHTML = '';
+
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const config = bandConfig || bandPresets[bandCount];
+
+            config.forEach((bandFreq, index) => {
+                const bandDiv = document.createElement('div');
+                bandDiv.className = 'band';
+                bandDiv.innerHTML = `
+                    <label>${bandFreq.label}</label>
+                    <input type="range" id="band-${index}" min="0" max="1" step="0.01" value="1">
+                    <div class="band-value" id="band-value-${index}">1.00</div>
+                `;
+                bandControls.appendChild(bandDiv);
+
+                // Event-Listener für Slider
+                const slider = bandDiv.querySelector(`#band-${index}`);
+                const valueDisplay = bandDiv.querySelector(`#band-value-${index}`);
+                
+                slider.addEventListener('input', () => {
+                    const value = parseFloat(slider.value);
+                    valueDisplay.textContent = value.toFixed(2);
+                    
+                    // Band-Gain aktualisieren (wenn Band existiert)
+                    if (bands[index] && bands[index].bandGain) {
+                        bands[index].bandGain.gain.value = value;
+                    }
+                });
+            });
+        }
+
+        function connectSignalFlow() {
+            // Vocoded Output mit Analyser und Destination verbinden
+            if (compressionNode) {
+                vocodedOutput.connect(compressionNode);
+                compressionNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            } else {
+                vocodedOutput.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            }
+
+            // Original Output (für A/B-Vergleich)
+            if (source && document.getElementById('audioSource').value === 'microphone') {
+                originalOutput.connect(audioCtx.destination);
+            }
+        }
+
+        function playSignal(type) {
+            if (!isPlaying) {
+                document.getElementById('status').textContent = 'Starte zuerst die Simulation!';
+                document.getElementById('status').className = 'status error';
+                return;
+            }
+
+            // Alle Ausgaben zurücksetzen
+            vocodedOutput.gain.value = 0;
+            originalOutput.gain.value = 0;
+
+            if (type === 'original' || type === 'both') {
+                originalOutput.gain.value = 1;
+                document.getElementById('visualizerStatus').textContent = 'Visualisierung: Original-Signal';
+                if (analyser) {
+                    if (source && document.getElementById('audioSource').value === 'microphone') {
+                        source.disconnect();
+                        source.connect(analyser);
+                    } else if (source && document.getElementById('audioSource').value === 'file') {
+                        source.disconnect();
+                        source.connect(analyser);
+                    }
+                }
+            }
+
+            if (type === 'vocoded' || type === 'both') {
+                vocodedOutput.gain.value = 1;
+                if (type === 'both') {
+                    document.getElementById('visualizerStatus').textContent = 'Visualisierung: Beide Signale';
+                } else {
+                    document.getElementById('visualizerStatus').textContent = 'Visualisierung: Vocoded-Signal';
+                }
+                if (analyser) {
+                    if (compressionNode) {
+                        compressionNode.disconnect();
+                        compressionNode.connect(analyser);
+                    } else {
+                        vocodedOutput.disconnect();
+                        vocodedOutput.connect(analyser);
+                    }
+                }
+            }
+        }
+
+        // ============================================
+        // Träger-Signal & Effekte
+        // ============================================
+
+        function updateCarrierType() {
+            if (!isPlaying) return;
+            
+            const carrierType = document.getElementById('carrierType').value;
+            
+            // Simulation neu starten mit neuem Träger
+            toggleSimulation();
+        }
+
+        function updateCompression() {
+            const isEnabled = document.getElementById('compressionToggle').checked;
+            
+            if (isEnabled && !compressionNode && audioCtx) {
+                compressionNode = audioCtx.createDynamicsCompressor();
+                compressionNode.threshold.value = -20;
+                compressionNode.knee.value = 10;
+                compressionNode.ratio.value = 4;
+                compressionNode.attack.value = 0.01;
+                compressionNode.release.value = 0.1;
+            } else if (!isEnabled && compressionNode) {
+                compressionNode.disconnect();
+                compressionNode = null;
+            }
+            
+            // Signalfluss neu verbinden
+            if (isPlaying) {
+                connectSignalFlow();
+            }
+        }
+
+        function toggleACE() {
+            updateACEInfo();
+            if (isPlaying) {
+                applyACE();
+            }
+        }
+
+        function updateACEInfo() {
+            const isEnabled = document.getElementById('aceToggle').checked;
+            const aceInfo = document.getElementById('aceInfo');
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const activeBands = Math.max(4, Math.floor(bandCount / 2));
+            
+            if (isEnabled) {
+                aceInfo.style.display = 'inline';
+                aceInfo.textContent = ` (Aktiviert: Nur die ${activeBands} lautesten Bänder)`;
+            } else {
+                aceInfo.style.display = 'none';
+            }
+        }
+
+        function applyACE() {
+            const isEnabled = document.getElementById('aceToggle').checked;
+            const bandCount = bands.length;
+            const activeBands = Math.max(4, Math.floor(bandCount / 2));
+
+            if (!isEnabled) {
+                // Alle Bänder aktivieren
+                bands.forEach(band => {
+                    band.bandGain.gain.value = parseFloat(document.getElementById(`band-${band.index}`).value);
+                });
+                return;
+            }
+
+            // Bänder nach Lautstärke sortieren (basierend auf Hüllkurve)
+            const bandsWithAmplitude = bands.map(band => {
+                // Wir schätzen die Amplitude durch den aktuellen Gain-Wert
+                // In einer echten Implementierung würde man die tatsächliche Hüllkurve messen
+                return {
+                    band,
+                    amplitude: band.bandGain.gain.value
+                };
+            }).sort((a, b) => b.amplitude - a.amplitude);
+
+            // Nur die Top-N Bänder aktivieren
+            bands.forEach(band => {
+                const isActive = bandsWithAmplitude.slice(0, activeBands).some(b => b.band === band);
+                const sliderValue = parseFloat(document.getElementById(`band-${band.index}`).value);
+                band.bandGain.gain.value = isActive ? sliderValue : 0;
+            });
+        }
+
+        // ============================================
+        // Visualisierung
+        // ============================================
+
+        function startVisualization() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            function draw() {
+                if (!analyser) {
+                    animationId = requestAnimationFrame(draw);
+                    return;
+                }
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                // Canvas löschen
+                visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+
+                // Balken zeichnen
+                const barWidth = visualizerCanvas.width / bufferLength;
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    const hue = i / bufferLength * 360;
+                    visualizerCtx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                    visualizerCtx.fillRect(
+                        i * barWidth,
+                        visualizerCanvas.height - barHeight,
+                        barWidth,
+                        barHeight
+                    );
+                }
+
+                animationId = requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+
+        // ============================================
+        // Hilfsfunktionen
+        // ============================================
+
+        function createNoiseBuffer(audioCtx, duration) {
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        function createRectifierCurve() {
+            const curve = new Float32Array(2);
+            curve[0] = 0;
+            curve[1] = 1;
+            return curve;
+        }
+
+        function calculateQ(freqLow, freqHigh) {
+            const centerFreq = (freqLow + freqHigh) / 2;
+            const bandwidth = freqHigh - freqLow;
+            return centerFreq / bandwidth;
+        }
+
+        // ============================================
+        // Event-Listener für globale UI-Elemente
+        // ============================================
+
+        // Automatisch Band-UI aktualisieren, wenn sich die Bandanzahl ändert
+        document.getElementById('bandCount').addEventListener('change', () => {
+            if (!isPlaying) {
+                updateBandCount();
+            }
+        });
+
+        // ACE-Info aktualisieren, wenn sich die Bandanzahl ändert
+        document.getElementById('bandCount').addEventListener('change', updateACEInfo);
+    </script>
+</body>
+</html>
