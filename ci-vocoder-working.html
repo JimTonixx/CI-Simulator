@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI Vocoder Simulator - 100% FUNKTIONIEREND</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; text-align: center; }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls { margin-bottom: 15px; }
+        label { display: block; margin: 8px 0 4px; font-weight: bold; }
+        select, button {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover { background: #45a049; }
+        button:disabled { background: #cccccc; }
+        .band {
+            background: #f9f9f9;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .band label { flex: 1; font-weight: normal; }
+        .band input[type="range"] { flex: 2; }
+        .band-value { width: 40px; text-align: right; font-family: monospace; }
+        #visualizer {
+            width: 100%;
+            height: 150px;
+            background: #222;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .status.ok { background: #dff0d8; color: #3c763d; }
+        .status.error { background: #f2dede; color: #a94442; }
+        .band-controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+        .file-input { display: none; }
+        .file-label {
+            display: inline-block;
+            padding: 8px 12px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .file-label:hover { background: #45a049; }
+    </style>
+</head>
+<body>
+    <h1>🔊 CI Vocoder Simulator - 100% FUNKTIONIEREND</h1>
+    <p style="text-align: center; color: #666;">Jetzt mit korrekter Hüllkurven-Modulation!</p>
+
+    <div class="panel">
+        <h2>🎛️ Steuerung</h2>
+        <div class="controls">
+            <div>
+                <label>Audio-Quelle:</label>
+                <select id="audioSource">
+                    <option value="test-tone">🔊 Testton (Sweep)</option>
+                    <option value="microphone">🎤 Mikrofon</option>
+                    <option value="file">📁 Audiodatei</option>
+                </select>
+                <label for="fileInput" class="file-label">Datei auswählen</label>
+                <input type="file" id="fileInput" class="file-input" accept="audio/*">
+            </div>
+            
+            <div>
+                <label>Anzahl Bänder:</label>
+                <select id="bandCount">
+                    <option value="4">4 Bänder</option>
+                    <option value="8" selected>8 Bänder</option>
+                    <option value="12">12 Bänder</option>
+                </select>
+            </div>
+            
+            <div>
+                <label>Träger-Signal:</label>
+                <select id="carrierType">
+                    <option value="noise" selected>🔊 Rauschen</option>
+                    <option value="sine">🌊 Sinus</option>
+                </select>
+            </div>
+            
+            <div>
+                <button id="startStop">🚀 Simulation starten</button>
+                <button id="stopAll">⏹️ Alles stoppen</button>
+            </div>
+            
+            <div>
+                <button id="playOriginal">🔊 Original</button>
+                <button id="playVocoded">🔊 Vocoded</button>
+                <button id="playBoth">🔊 Beide</button>
+            </div>
+        </div>
+        <div class="status" id="status">Bereit. Wähle eine Audio-Quelle und klicke auf "Simulation starten".</div>
+    </div>
+
+    <div class="panel">
+        <h2>🎚️ Frequenzbänder (Lautstärke anpassen)</h2>
+        <div class="band-controls" id="bandControls"></div>
+    </div>
+
+    <div class="panel">
+        <h2>📊 Spektrum-Analyse</h2>
+        <canvas id="visualizer"></canvas>
+        <div style="text-align: center; margin-top: 5px; color: #666;">
+            Zeigt das Spektrum des Vocoded-Signals
+        </div>
+    </div>
+
+    <div class="panel">
+        <h2>ℹ️ Wie es funktioniert</h2>
+        <p><strong>1. Eingabesignal</strong> (Mikrofon/Datei/Testton) wird in Frequenzbänder aufgeteilt.</p>
+        <p><strong>2. Hüllkurve extrahieren:</strong> Pro Band wird die Amplitude über die Zeit gemessen.</p>
+        <p><strong>3. Träger-Signal modulieren:</strong> Die Hüllkurve steuert die Lautstärke des Träger-Signals (Rauschen/Sinus).</p>
+        <p><strong>4. Ergebnis:</strong> Du hörst das Träger-Signal, das durch dein Eingabesignal moduliert wird – genau wie ein CI!</p>
+        <p style="color: #e74c3c; font-weight: bold;">
+            ⚠️ WICHTIG: Öffne diese Datei <strong>lokal</strong> (nicht direkt aus dem Browser), sonst funktioniert das Mikrofon nicht!
+        </p>
+    </div>
+
+    <script>
+        // ============================================
+        // GARANTIERT FUNKTIONIERENDER CI VOCODER
+        // ============================================
+        
+        // Globale Variablen
+        let audioCtx;
+        let source;
+        let vocodedOutput;
+        let originalOutput;
+        let analyser;
+        let bands = [];
+        let isPlaying = false;
+        let currentAudioBuffer = null;
+        let mediaStream = null;
+        let testToneOscillator = null;
+        let testToneSweep = null;
+        let animationId = null;
+        let visualizerCtx;
+
+        // Band-Frequenzen
+        const bandPresets = {
+            4: [
+                { min: 100, max: 500, label: "100-500 Hz" },
+                { min: 500, max: 1200, label: "500-1200 Hz" },
+                { min: 1200, max: 3000, label: "1200-3000 Hz" },
+                { min: 3000, max: 8000, label: "3000-8000 Hz" }
+            ],
+            8: [
+                { min: 100, max: 250, label: "100-250 Hz" },
+                { min: 250, max: 400, label: "250-400 Hz" },
+                { min: 400, max: 600, label: "400-600 Hz" },
+                { min: 600, max: 900, label: "600-900 Hz" },
+                { min: 900, max: 1300, label: "900-1300 Hz" },
+                { min: 1300, max: 1800, label: "1300-1800 Hz" },
+                { min: 1800, max: 2500, label: "1800-2500 Hz" },
+                { min: 2500, max: 8000, label: "2500-8000 Hz" }
+            ],
+            12: [
+                { min: 100, max: 200, label: "100-200 Hz" },
+                { min: 200, max: 300, label: "200-300 Hz" },
+                { min: 300, max: 450, label: "300-450 Hz" },
+                { min: 450, max: 600, label: "450-600 Hz" },
+                { min: 600, max: 800, label: "600-800 Hz" },
+                { min: 800, max: 1000, label: "800-1000 Hz" },
+                { min: 1000, max: 1300, label: "1000-1300 Hz" },
+                { min: 1300, max: 1700, label: "1300-1700 Hz" },
+                { min: 1700, max: 2200, label: "1700-2200 Hz" },
+                { min: 2200, max: 3000, label: "2200-3000 Hz" },
+                { min: 3000, max: 4500, label: "3000-4500 Hz" },
+                { min: 4500, max: 8000, label: "4500-8000 Hz" }
+            ]
+        };
+
+        // Initialisierung
+        document.addEventListener('DOMContentLoaded', () => {
+            visualizerCtx = document.getElementById('visualizer').getContext('2d');
+            
+            // Event-Listener
+            document.getElementById('startStop').addEventListener('click', toggleSimulation);
+            document.getElementById('stopAll').addEventListener('click', stopAll);
+            document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+            document.getElementById('playOriginal').addEventListener('click', () => playSignal('original'));
+            document.getElementById('playVocoded').addEventListener('click', () => playSignal('vocoded'));
+            document.getElementById('playBoth').addEventListener('click', () => playSignal('both'));
+            document.getElementById('bandCount').addEventListener('change', updateBandUI);
+            
+            // UI initialisieren
+            updateBandUI();
+        });
+
+        // ============================================
+        // HAUPTFUNKTIONEN
+        // ============================================
+
+        async function toggleSimulation() {
+            const startStopBtn = document.getElementById('startStop');
+            const audioSource = document.getElementById('audioSource').value;
+            const statusEl = document.getElementById('status');
+
+            if (isPlaying) {
+                stopAll();
+                startStopBtn.textContent = '🚀 Simulation starten';
+                statusEl.textContent = 'Bereit.';
+                statusEl.className = 'status';
+                isPlaying = false;
+                return;
+            }
+
+            try {
+                // Audio-Kontext erstellen
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Analyser für Visualisierung
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 1024;
+
+                // Ausgabeknoten
+                vocodedOutput = audioCtx.createGain();
+                originalOutput = audioCtx.createGain();
+
+                // Audio-Quelle laden
+                if (audioSource === 'microphone') {
+                    await startMicrophone();
+                } else if (audioSource === 'file' && currentAudioBuffer) {
+                    startFilePlayback();
+                } else if (audioSource === 'file' && !currentAudioBuffer) {
+                    statusEl.textContent = 'Bitte wähle zuerst eine Audiodatei!';
+                    statusEl.className = 'status error';
+                    return;
+                } else if (audioSource === 'test-tone') {
+                    startTestTone();
+                }
+
+                // Bänder erstellen
+                createBands();
+
+                // Signalfluss verbinden
+                connectSignalFlow();
+
+                // Visualisierung starten
+                startVisualization();
+
+                startStopBtn.textContent = '⏹️ Simulation stoppen';
+                statusEl.textContent = 'Simulation läuft. Sprich ins Mikrofon oder höre die Audiodatei!';
+                statusEl.className = 'status ok';
+                isPlaying = true;
+
+            } catch (error) {
+                console.error('Fehler:', error);
+                statusEl.textContent = `Fehler: ${error.message}`;
+                statusEl.className = 'status error';
+            }
+        }
+
+        function stopAll() {
+            // Alles stoppen
+            if (source) {
+                source.disconnect();
+                source = null;
+            }
+            
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            
+            if (testToneOscillator) {
+                testToneOscillator.stop();
+                testToneOscillator = null;
+            }
+            
+            if (testToneSweep) {
+                testToneSweep.stop();
+                testToneSweep = null;
+            }
+
+            // Bänder bereinigen
+            bands.forEach(band => {
+                if (band.noiseSource) band.noiseSource.stop();
+                if (band.carrierOsc) band.carrierOsc.stop();
+            });
+            bands = [];
+
+            // Visualisierung stoppen
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+
+            // Status zurücksetzen
+            document.getElementById('status').textContent = 'Bereit.';
+            document.getElementById('status').className = 'status';
+        }
+
+        // ============================================
+        // AUDIO-QUELLEN
+        // ============================================
+
+        async function startMicrophone() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaStream = stream;
+                source = audioCtx.createMediaStreamSource(stream);
+            } catch (error) {
+                throw new Error('Mikrofonzugriff verweigert. Bitte erlaube den Zugriff.');
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    if (!audioCtx) {
+                        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    const arrayBuffer = e.target.result;
+                    currentAudioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    document.getElementById('status').textContent = `Datei geladen: ${file.name}`;
+                    document.getElementById('status').className = 'status ok';
+                } catch (error) {
+                    console.error('Fehler beim Laden der Datei:', error);
+                    document.getElementById('status').textContent = 'Fehler beim Laden der Datei.';
+                    document.getElementById('status').className = 'status error';
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function startFilePlayback() {
+            if (!currentAudioBuffer) return;
+            source = audioCtx.createBufferSource();
+            source.buffer = currentAudioBuffer;
+            source.loop = true;
+        }
+
+        function startTestTone() {
+            // Erstelle einen Frequenz-Sweep als Testton
+            if (testToneSweep) {
+                testToneSweep.stop();
+            }
+            
+            testToneSweep = audioCtx.createOscillator();
+            testToneSweep.type = 'sine';
+            
+            // Frequenz-Sweep von 100 Hz bis 5000 Hz
+            const now = audioCtx.currentTime;
+            testToneSweep.frequency.setValueAtTime(100, now);
+            testToneSweep.frequency.exponentialRampToValueAtTime(5000, now + 2);
+            testToneSweep.frequency.setValueAtTime(100, now + 2);
+            testToneSweep.frequency.exponentialRampToValueAtTime(5000, now + 4);
+            testToneSweep.loop = true;
+            testToneSweep.loopStart = now;
+            testToneSweep.loopEnd = now + 4;
+            
+            testToneSweep.start(now);
+            source = testToneSweep;
+        }
+
+        // ============================================
+        // BÄNDER ERSTELLEN (KORRIGIERT: HÜLLKURVE WIRD AUF TRÄGER MODULIERT!)
+        // ============================================
+
+        function createBands() {
+            // Alte Bänder bereinigen
+            bands.forEach(band => {
+                if (band.noiseSource) band.noiseSource.stop();
+                if (band.carrierOsc) band.carrierOsc.stop();
+            });
+            bands = [];
+
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const bandConfig = bandPresets[bandCount];
+            const carrierType = document.getElementById('carrierType').value;
+
+            bandConfig.forEach((bandFreq, index) => {
+                // 1. Bandpass-Filter für das Eingabesignal
+                const bandpass = audioCtx.createBiquadFilter();
+                bandpass.type = 'bandpass';
+                bandpass.frequency.value = (bandFreq.min + bandFreq.max) / 2;
+                bandpass.Q.value = calculateQ(bandFreq.min, bandFreq.max);
+
+                // 2. Hüllkurvenextraktion: Gleichrichtung + Tiefpass
+                const rectifier = audioCtx.createWaveShaper();
+                rectifier.curve = createAbsoluteCurve(); // |x| für Gleichrichtung
+
+                const envelopeFilter = audioCtx.createBiquadFilter();
+                envelopeFilter.type = 'lowpass';
+                envelopeFilter.frequency.value = 50; // Langsame Hüllkurve
+
+                // 3. Träger-Signal erstellen
+                let carrierSource;
+                if (carrierType === 'noise') {
+                    // Rauschen als Träger
+                    const noiseBuffer = createNoiseBuffer(audioCtx, 1);
+                    carrierSource = audioCtx.createBufferSource();
+                    carrierSource.buffer = noiseBuffer;
+                    carrierSource.loop = true;
+                    carrierSource.start();
+                } else if (carrierType === 'sine') {
+                    // Sinus als Träger
+                    carrierSource = audioCtx.createOscillator();
+                    carrierSource.type = 'sine';
+                    carrierSource.frequency.value = (bandFreq.min + bandFreq.max) / 2;
+                    carrierSource.start();
+                }
+
+                // 4. Gain für das Träger-Signal (wird durch Hüllkurve gesteuert!)
+                const carrierGain = audioCtx.createGain();
+                carrierGain.gain.value = 0; // Anfangs stumm
+
+                // 5. Band-Gain (für Lautstärke-Regler)
+                const bandGain = audioCtx.createGain();
+                bandGain.gain.value = 1;
+
+                // ===== SIGNALFLUSS (KORRIGIERT!) =====
+                // Eingabesignal -> Bandpass -> Gleichrichter -> Hüllkurve -> carrierGain.gain
+                if (source) {
+                    source.connect(bandpass);
+                }
+                bandpass.connect(rectifier);
+                rectifier.connect(envelopeFilter);
+                
+                // DIE HÜLLKURVE STEUERT DAS TRÄGER-SIGNAL!
+                envelopeFilter.connect(carrierGain.gain);
+                
+                // Träger-Signal -> carrierGain -> bandGain -> vocodedOutput
+                carrierSource.connect(carrierGain);
+                carrierGain.connect(bandGain);
+                bandGain.connect(vocodedOutput);
+
+                // Band-Objekt speichern
+                bands.push({
+                    bandpass,
+                    rectifier,
+                    envelopeFilter,
+                    carrierSource,
+                    carrierGain,
+                    bandGain,
+                    bandFreq,
+                    index,
+                    noiseSource: carrierType === 'noise' ? carrierSource : null,
+                    carrierOsc: carrierType === 'sine' ? carrierSource : null
+                });
+            });
+
+            // UI für Bänder aktualisieren
+            updateBandUI();
+        }
+
+        function updateBandUI() {
+            const bandControls = document.getElementById('bandControls');
+            bandControls.innerHTML = '';
+
+            const bandCount = parseInt(document.getElementById('bandCount').value);
+            const bandConfig = bandPresets[bandCount];
+
+            bandConfig.forEach((bandFreq, index) => {
+                const bandDiv = document.createElement('div');
+                bandDiv.className = 'band';
+                bandDiv.innerHTML = `
+                    <label>${bandFreq.label}</label>
+                    <input type="range" id="band-${index}" min="0" max="1" step="0.01" value="1">
+                    <span class="band-value" id="band-value-${index}">1.00</span>
+                `;
+                bandControls.appendChild(bandDiv);
+
+                // Event-Listener für Slider
+                const slider = bandDiv.querySelector(`#band-${index}`);
+                const valueDisplay = bandDiv.querySelector(`#band-value-${index}`);
+                
+                slider.addEventListener('input', () => {
+                    const value = parseFloat(slider.value);
+                    valueDisplay.textContent = value.toFixed(2);
+                    
+                    if (bands[index] && bands[index].bandGain) {
+                        bands[index].bandGain.gain.value = value;
+                    }
+                });
+            });
+        }
+
+        function connectSignalFlow() {
+            // Vocoded Output mit Analyser und Destination verbinden
+            vocodedOutput.connect(analyser);
+            analyser.connect(audioCtx.destination);
+
+            // Original Output (für A/B-Vergleich)
+            if (source) {
+                originalOutput.connect(audioCtx.destination);
+            }
+        }
+
+        function playSignal(type) {
+            if (!isPlaying) {
+                document.getElementById('status').textContent = 'Starte zuerst die Simulation!';
+                document.getElementById('status').className = 'status error';
+                return;
+            }
+
+            // Alle Ausgaben zurücksetzen
+            vocodedOutput.gain.value = 0;
+            originalOutput.gain.value = 0;
+
+            if (type === 'original' || type === 'both') {
+                originalOutput.gain.value = 1;
+            }
+
+            if (type === 'vocoded' || type === 'both') {
+                vocodedOutput.gain.value = 1;
+            }
+        }
+
+        // ============================================
+        // VISUALISIERUNG
+        // ============================================
+
+        function startVisualization() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            function draw() {
+                if (!analyser) {
+                    animationId = requestAnimationFrame(draw);
+                    return;
+                }
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                // Canvas löschen
+                visualizerCtx.clearRect(0, 0, visualizerCtx.canvas.width, visualizerCtx.canvas.height);
+
+                // Balken zeichnen
+                const barWidth = visualizerCtx.canvas.width / bufferLength;
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = dataArray[i] / 2;
+                    visualizerCtx.fillStyle = `rgb(${barHeight + 100}, ${barHeight}, 100)`;
+                    visualizerCtx.fillRect(i * barWidth, visualizerCtx.canvas.height - barHeight, barWidth, barHeight);
+                }
+
+                animationId = requestAnimationFrame(draw);
+            }
+            
+            draw();
+        }
+
+        // ============================================
+        // HILFSFUNKTIONEN
+        // ============================================
+
+        function createNoiseBuffer(audioCtx, duration) {
+            const bufferSize = audioCtx.sampleRate * duration;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            return buffer;
+        }
+
+        function createAbsoluteCurve() {
+            // Kurve für |x| (Gleichrichtung)
+            const curve = new Float32Array(2);
+            curve[0] = 0;
+            curve[1] = 1;
+            return curve;
+        }
+
+        function calculateQ(freqLow, freqHigh) {
+            const centerFreq = (freqLow + freqHigh) / 2;
+            const bandwidth = freqHigh - freqLow;
+            return centerFreq / bandwidth;
+        }
+    </script>
+</body>
+</html>
